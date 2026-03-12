@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EcoWatch Professional — Geospatial Monitoring</title>
+  <meta name="description"
+    content="EcoWatch Professional: AI-powered satellite vegetation monitoring and legal compliance audit platform.">
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <!-- Leaflet Draw CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"
+    crossorigin="">
+  <!-- EcoWatch styles -->
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+
+<body>
+
+  <!-- ══════════════════ HEADER ══════════════════ -->
+  <header id="header">
+    <div class="logo">
+      <div class="logo-icon">🌍</div>
+      <div>
+        <div class="logo-text">EcoWatch Pro</div>
+        <div class="logo-sub">Geospatial Monitoring Suite</div>
+      </div>
+    </div>
+
+    <div class="header-search" style="position:relative">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="search-bar" placeholder="Search location (e.g. Kishangarh, Jaipur)…" autocomplete="off">
+      <ul id="search-suggestions" style="
+        display:none;
+        position:absolute;
+        top:calc(100% + 6px);
+        left:0; right:0;
+        background:#1a2235;
+        border:1px solid rgba(0,195,255,0.25);
+        border-radius:10px;
+        overflow:hidden;
+        z-index:9999;
+        list-style:none;
+        margin:0; padding:0;
+        box-shadow:0 8px 32px rgba(0,0,0,0.5);
+      "></ul>
+    </div>
+
+    <div class="header-status">
+      <div class="status-dot" id="status-dot"></div>
+      <span id="status-label">Connecting…</span>
+    </div>
+
+    <div class="header-right">
+      <div class="btn-icon" id="btn-boss" title="Boss Interface">🛡</div>
+      <div class="btn-icon" title="Refresh" onclick="window.location.reload()">🔄</div>
+    </div>
+  </header>
+
+  <!-- ══════════════════ APP BODY ══════════════════ -->
+  <div id="app">
+
+    <!-- ── Left Sidebar Navigation ── -->
+    <nav id="nav">
+      <div class="nav-section">
+        <div class="nav-label">Main</div>
+
+        <div class="nav-item active" data-panel="dashboard">
+          <span class="nav-icon">📊</span> Dashboard
+        </div>
+
+        <div class="nav-item" data-panel="alerts">
+          <span class="nav-icon">🚨</span> Alerts
+          <span class="nav-badge" id="alert-badge" style="display:none">0</span>
+        </div>
+
+        <div class="nav-item" data-panel="analysis">
+          <span class="nav-icon">🛰</span> Analysis
+        </div>
+
+        <div class="nav-item" data-panel="reports">
+          <span class="nav-icon">📄</span> Reports
+        </div>
+      </div>
+
+      <div class="nav-divider"></div>
+
+      <div class="nav-section">
+        <div class="nav-label">Advanced</div>
+
+        <div class="nav-item" data-panel="boss">
+          <span class="nav-icon">🛡</span> Boss Interface
+        </div>
+
+        <div class="nav-item" data-panel="legal">
+          <span class="nav-icon">⚖</span> Legal Zones
+        </div>
+      </div>
+
+      <div class="nav-divider"></div>
+
+      <div class="nav-section">
+        <div class="nav-label">System</div>
+        <div class="nav-item" onclick="checkApiHealth()" style="cursor:pointer">
+          <span class="nav-icon">❤</span> Health Check
+        </div>
+      </div>
+    </nav>
+
+    <!-- ── Main Content ── -->
+    <div id="main">
+
+      <!-- Map -->
+      <div id="map-wrap">
+        <div id="map"></div>
+        <div class="map-badge">
+          Proj: <span id="map-proj">Jaipur, Rajasthan</span> &nbsp;|&nbsp;
+          Zoom: <span id="map-zoom">11</span>
+        </div>
+      </div>
+
+      <!-- Right Panel Sidebar -->
+      <div id="sidebar">
+
+        <!-- ╔══════════════════════════════╗
+           ║      DASHBOARD PANEL         ║
+           ╚══════════════════════════════╝ -->
+        <div class="panel active" id="panel-dashboard">
+          <div class="panel-header">
+            <div class="panel-title"><span class="icon">📊</span> Dashboard</div>
+            <div class="panel-sub">Real-time monitoring overview</div>
+          </div>
+          <div class="panel-body">
+
+            <div class="stats-grid">
+              <div class="stat-card">
+                <div class="stat-label">Total Analyses</div>
+                <div class="stat-value" id="dash-total">—</div>
+                <div class="stat-sub">All time</div>
+              </div>
+              <div class="stat-card danger">
+                <div class="stat-label">HIGH Alerts</div>
+                <div class="stat-value" id="dash-high">—</div>
+                <div class="stat-sub">Needs action</div>
+              </div>
+              <div class="stat-card warning">
+                <div class="stat-label">MEDIUM Alerts</div>
+                <div class="stat-value" id="dash-medium">—</div>
+                <div class="stat-sub">Monitoring</div>
+              </div>
+              <div class="stat-card info">
+                <div class="stat-label">Avg NDVI Δ</div>
+                <div class="stat-value" id="dash-ndvi">—</div>
+                <div class="stat-sub">All projects</div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-title">🌿 System Status</div>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <div style="display:flex;justify-content:space-between;font-size:12px">
+                  <span style="color:var(--text-muted)">Sentinel-2 API</span>
+                  <span class="header-status">
+                    <div class="status-dot" style="width:6px;height:6px"></div>Active
+                  </span>
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:12px">
+                  <span style="color:var(--text-muted)">Google Earth Engine</span>
+                  <span style="color:var(--text-muted)">Fallback</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:12px">
+                  <span style="color:var(--text-muted)">MongoDB</span>
+                  <span id="dash-mongo" style="color:var(--text-muted)">Checking…</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:12px">
+                  <span style="color:var(--text-muted)">PDF Engine</span>
+                  <span style="color:var(--accent-green)">Ready</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-title">📡 Recent Activity</div>
+              <div id="dash-activity" style="font-size:12px;color:var(--text-muted)">
+                Loading…
+              </div>
+            </div>
+
+            <div class="card" style="background:linear-gradient(135deg,rgba(0,245,160,0.06),rgba(0,195,255,0.06))">
+              <div class="card-title" style="color:var(--accent-green)">⚡ Quick Start</div>
+              <p style="font-size:12px;color:var(--text-muted);line-height:1.6">
+                1. Click <strong style="color:var(--text-primary)">Analysis</strong> in the sidebar<br>
+                2. Pick a location or click the map<br>
+                3. Choose years to compare<br>
+                4. Hit <strong style="color:var(--accent-green)">Run Satellite Analysis</strong>
+              </p>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ╔══════════════════════════════╗
+           ║       ALERTS PANEL           ║
+           ╚══════════════════════════════╝ -->
+        <div class="panel" id="panel-alerts">
+          <div class="panel-header">
+            <div class="panel-title"><span class="icon">🚨</span> Live Alert Feed</div>
+            <div class="panel-sub">Auto-refreshes every 30 seconds</div>
+          </div>
+          <div class="panel-body">
+            <div id="alerts-list">
+              <div class="empty-state">
+                <div class="empty-icon">🛰️</div>
+                <p>No alerts yet. Run an analysis to populate this feed.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ╔══════════════════════════════╗
+           ║      ANALYSIS PANEL          ║
+           ╚══════════════════════════════╝ -->
+        <div class="panel" id="panel-analysis">
+          <div class="panel-header">
+            <div class="panel-title"><span class="icon">🛰</span> Temporal Analysis</div>
+            <div class="panel-sub">Satellite NDVI comparison across years</div>
+          </div>
+          <div class="panel-body">
+
+            <form id="analysis-form">
+
+              <div class="form-row">
+                <label class="form-label" for="input-project">Area Name</label>
+                <input class="form-input" id="input-project" type="text" placeholder="e.g. Vidhyadhar Nagar, Jaipur"
+                  required>
+              </div>
+
+              <div class="section-title" style="margin-bottom:6px">Quick Locations</div>
+              <div class="quick-locations" id="quick-locs"></div>
+
+              <div class="form-row-grid">
+                <div class="form-row">
+                  <label class="form-label" for="input-lat">Latitude</label>
+                  <input class="form-input" id="input-lat" type="number" step="0.000001" placeholder="26.9124"
+                    value="26.9124" required>
+                </div>
+                <div class="form-row">
+                  <label class="form-label" for="input-lon">Longitude</label>
+                  <input class="form-input" id="input-lon" type="number" step="0.000001" placeholder="75.7873"
+                    value="75.7873" required>
+                </div>
+              </div>
+
+              <div class="form-row-grid">
+                <div class="form-row">
+                  <label class="form-label" for="input-y1">Year 1 (Before)</label>
+                  <input class="form-input" id="input-y1" type="number" min="2017" max="2030" value="2022" required>
+                </div>
+                <div class="form-row">
+                  <label class="form-label" for="input-y2">Year 2 (After)</label>
+                  <input class="form-input" id="input-y2" type="number" min="2017" max="2030" value="2024" required>
+                </div>
+              </div>
+
+              <div class="slider-wrap">
+                <div class="slider-label">
+                  <span>NDVI Sensitivity</span>
+                  <span id="sens-val">0.10</span>
+                </div>
+                <input type="range" id="slider-sensitivity" min="0.01" max="0.5" step="0.01" value="0.1"
+                  oninput="document.getElementById('sens-val').textContent = parseFloat(this.value).toFixed(2)">
+              </div>
+
+              <button type="submit" class="btn-primary" id="btn-run">
+                🛰 Run Satellite Analysis
+              </button>
+            </form>
+
+            <!-- Result box (hidden initially) -->
+            <div class="analysis-result" id="analysis-result">
+              <div class="result-header">
+                <span class="result-label">Analysis Result</span>
+                <span class="result-alert LOW" id="res-alert">LOW</span>
+              </div>
+
+              <div class="result-metrics">
+                <div class="metric-box">
+                  <div class="metric-val" id="res-ndvi">0.0000</div>
+                  <div class="metric-lbl">NDVI Change</div>
+                </div>
+                <div class="metric-box">
+                  <div class="metric-val" id="res-ssim">—</div>
+                  <div class="metric-lbl">SSIM Score</div>
+                </div>
+                <div class="metric-box">
+                  <div class="metric-val" id="res-y1ndvi">—</div>
+                  <div class="metric-lbl">NDVI Year 1</div>
+                </div>
+                <div class="metric-box">
+                  <div class="metric-val" id="res-y2ndvi">—</div>
+                  <div class="metric-lbl">NDVI Year 2</div>
+                </div>
+              </div>
+              <!-- NDVI interpretation line -->
+              <div id="ndvi-interpretation"
+                style="font-size:12px;font-weight:600;margin:-4px 0 10px;padding:6px 10px;border-radius:8px;background:#f0fdf4;text-align:center;">
+                🟢 Vegetation stable or improved</div>
+
+              <div class="ndvi-chart-wrap">
+                <div class="ndvi-chart-title">NDVI Comparison</div>
+                <canvas id="ndvi-chart" height="140"></canvas>
+              </div>
+
+              <!-- ── Satellite Photo Comparison ── -->
+              <div class="sat-compare-wrap" id="sat-compare-wrap">
+                <div class="sat-compare-header">
+                  <span class="sat-compare-title">🛰 Satellite Visual Comparison</span>
+                  <span class="sat-source-badge">NASA GIBS · MODIS Terra</span>
+                </div>
+                <!-- Slider compare container -->
+                <div class="sat-slider-container" id="sat-slider-container">
+                  <!-- BEFORE map (Year 1) -->
+                  <div id="sat-map-before" class="sat-mini-map"></div>
+                  <!-- AFTER map (Year 2) — clipped by slider -->
+                  <div id="sat-map-after" class="sat-mini-map sat-map-after-clip"></div>
+                  <!-- Drag handle -->
+                  <div class="sat-slider-handle" id="sat-slider-handle">
+                    <div class="sat-handle-line"></div>
+                    <div class="sat-handle-circle">⇔</div>
+                  </div>
+                  <!-- Labels -->
+                  <div class="sat-label sat-label-before" id="sat-label-before">— Before</div>
+                  <div class="sat-label sat-label-after" id="sat-label-after">After —</div>
+                </div>
+                <div class="sat-compare-note">
+                  Drag the centre handle to compare satellite imagery · Source: NASA Earthdata (MODIS)
+                </div>
+              </div>
+
+              <div style="margin-top:10px">
+                <div class="section-title">Analysis Notes</div>
+                <ul class="notes-list" id="res-notes"></ul>
+              </div>
+
+              <button class="btn-download-pdf" id="btn-pdf" style="display:none">
+                📥 Download Legal Audit PDF
+              </button>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ╔══════════════════════════════╗
+           ║       REPORTS PANEL          ║
+           ╚══════════════════════════════╝ -->
+        <div class="panel" id="panel-reports">
+          <div class="panel-header">
+            <div class="panel-title"><span class="icon">📄</span> Audit Reports</div>
+            <div class="panel-sub">Legal compliance paper trail — MongoDB log</div>
+          </div>
+          <div class="panel-body" style="padding:0">
+            <div class="report-table-wrap">
+              <table class="report-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Project</th>
+                    <th>NDVI Δ</th>
+                    <th>Alert</th>
+                    <th>Date</th>
+                    <th>Satellite</th>
+                    <th>PDF</th>
+                  </tr>
+                </thead>
+                <tbody id="reports-tbody">
+                  <tr>
+                    <td colspan="7" style="text-align:center;padding:32px;color:var(--text-muted)">Loading…</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ╔══════════════════════════════╗
+           ║      BOSS INTERFACE          ║
+           ╚══════════════════════════════╝ -->
+        <div class="panel" id="panel-boss">
+          <div class="panel-header">
+            <div class="panel-title"><span class="icon">🛡</span> Boss Interface</div>
+            <div class="panel-sub">Advanced map overlays & toggles</div>
+          </div>
+          <div class="panel-body">
+            <div class="boss-header">
+              <span class="boss-icon">🛡</span>
+              <div class="boss-title">Command Center</div>
+              <div class="boss-sub">Full-spectrum geospatial control</div>
+            </div>
+
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-info">🔥 Deforestation Heatmap</div>
+                <div class="toggle-desc">Overlay change intensity on map</div>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="toggle-heatmap">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-info">🗺 Satellite Labels</div>
+                <div class="toggle-desc">Show location annotations</div>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="toggle-labels">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-info">📡 Auto-Refresh Alerts</div>
+                <div class="toggle-desc">Poll server every 30s (active)</div>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="toggle-autorefresh" checked>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-info">🌿 NDVI Threshold Alert</div>
+                <div class="toggle-desc">Alert when NDVI drops &gt; 0.10</div>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="toggle-ndvi-alert" checked>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+
+            <div style="margin-top:16px" class="card">
+              <div class="card-title">📊 Quick Stats</div>
+              <div style="font-size:12px;color:var(--text-muted);line-height:2">
+                <div>Total Analyses: <strong style="color:var(--text-primary)" id="boss-total">—</strong></div>
+                <div>Highest Alert: <strong style="color:var(--accent-red)" id="boss-worst">—</strong></div>
+                <div>Data Source: <strong style="color:var(--accent-blue)">API + Mock Fallback</strong></div>
+                <div>Map Projection: <strong style="color:var(--text-primary)">WGS84 / EPSG:4326</strong></div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ╔══════════════════════════════╗
+           ║      LEGAL ZONES PANEL       ║
+           ╚══════════════════════════════╝ -->
+        <div class="panel" id="panel-legal">
+          <div class="panel-header">
+            <div class="panel-title"><span class="icon">⚖</span> Legal Boundaries</div>
+            <div class="panel-sub">Environmental protection zones — Rajasthan</div>
+          </div>
+          <div class="panel-body">
+
+            <div class="legal-zone zone-red">
+              <div class="zone-name">🔴 Aravalli Eco-sensitive Zone</div>
+              <div class="zone-desc">Strictly protected under SC order 2009. No construction or mining permitted within
+                2 km.</div>
+              <div class="zone-status" style="color:var(--accent-red)">🔒 Protected — Violation Reported</div>
+            </div>
+
+            <div class="legal-zone zone-amber">
+              <div class="zone-name">🟡 Jaipur Green Belt</div>
+              <div class="zone-desc">JDA-regulated buffer zone. Limited construction subject to NOC from RSPCB.</div>
+              <div class="zone-status" style="color:var(--accent-amber)">⚠ Buffer Zone — Monitoring Active</div>
+            </div>
+
+            <div class="legal-zone zone-green">
+              <div class="zone-name">🟢 Agricultural Use Zone</div>
+              <div class="zone-desc">Permitted for agricultural and horticulture activities under State Land Use Policy
+                2020.</div>
+              <div class="zone-status" style="color:var(--accent-green)">✓ Compliant</div>
+            </div>
+
+            <div class="legal-zone zone-blue">
+              <div class="zone-name">🔵 Reservoir Buffer (Ramgarh)</div>
+              <div class="zone-desc">1 km buffer under Water Bodies Protection Act. Discharges strictly prohibited.
+              </div>
+              <div class="zone-status" style="color:var(--accent-blue)">📡 Satellite Monitoring</div>
+            </div>
+
+            <div class="legal-zone zone-amber">
+              <div class="zone-name">🟡 Nahargarh Wildlife Corridor</div>
+              <div class="zone-desc">Wildlife movement corridor. Infrastructure projects require Forest Dept clearance.
+              </div>
+              <div class="zone-status" style="color:var(--accent-amber)">⚠ Partial Encroachment Detected</div>
+            </div>
+
+            <div class="card" style="margin-top:4px">
+              <div class="card-title">📜 Legal Framework</div>
+              <div style="font-size:11px;color:var(--text-muted);line-height:1.8">
+                • Environment Protection Act, 1986<br>
+                • Forest Conservation Act, 1980<br>
+                • Wildlife Protection Act, 1972<br>
+                • MoEFCC Eco-Sensitive Zone Notifications<br>
+                • RSPCB State Guidelines 2023
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </div><!-- /#sidebar -->
+    </div><!-- /#main -->
+  </div><!-- /#app -->
+
+  <!-- ══════════════════ TOAST CONTAINER ══════════════════ -->
+  <div id="toast-container"></div>
+
+  <!-- ══════════════════ SCRIPTS ══════════════════ -->
+  <!-- Leaflet -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <!-- Leaflet Draw -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js" crossorigin=""></script>
+  <!-- Leaflet Heat -->
+  <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <!-- EcoWatch App (ES Module) -->
+  <script type="module" src="js/app.js"></script>
+
+  <!-- Search bar handler (inline, must be after DOM) -->
+  <script>
+    // Expose health check globally
+    window.checkApiHealth = async function () {
+      const dot = document.getElementById('status-dot');
+      const lbl = document.getElementById('status-label');
+      try {
+        const r = await fetch('/api/health');
+        const d = await r.json();
+        dot.className = 'status-dot';
+        lbl.textContent = `API: ${d.status} | DB: ${d.mongo}`;
+        document.getElementById('dash-mongo').textContent = d.mongo === 'connected' ? '🟢 Connected' : '🟡 Degraded';
+        document.getElementById('boss-total').textContent = '—';
+      } catch {
+        dot.className = 'status-dot offline';
+        lbl.textContent = 'Server: Offline';
+      }
+    };
+
+    // ── Location Search with Live Suggestions ─────────────────────────
+    document.addEventListener('DOMContentLoaded', () => {
+      const searchInput = document.getElementById('search-bar');
+      const suggBox = document.getElementById('search-suggestions');
+      if (!searchInput || !suggBox) return;
+
+      let debounceTimer = null;
+      let currentSuggs = [];
+
+      function showSuggestions(results) {
+        currentSuggs = results;
+        if (!results.length) { suggBox.style.display = 'none'; return; }
+        suggBox.innerHTML = results.map((r, i) => {
+          const name = r.display_name.split(',').slice(0, 3).join(', ');
+          return `<li data-idx="${i}" style="padding:10px 14px;cursor:pointer;font-size:13px;color:#c8d8f8;border-bottom:1px solid rgba(255,255,255,0.05);display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(0,195,255,0.12)'" onmouseout="this.style.background='transparent'">
+            <span>📍</span><span>${name}</span>
+          </li>`;
+        }).join('');
+        suggBox.style.display = 'block';
+      }
+
+      function hideSuggestions() { suggBox.style.display = 'none'; }
+
+      function goToLocation(item) {
+        const lat = parseFloat(item.lat);
+        const lon = parseFloat(item.lon);
+        const label = item.display_name.split(',')[0];
+
+        // Use ecoZoom (from ES module) — it is assigned on window
+        if (typeof window.ecoZoom === 'function') {
+          window.ecoZoom(lat, lon, label);
+        }
+
+        // Populate analysis form
+        const latI = document.getElementById('input-lat');
+        const lonI = document.getElementById('input-lon');
+        const projI = document.getElementById('input-project');
+        if (latI) latI.value = lat.toFixed(6);
+        if (lonI) lonI.value = lon.toFixed(6);
+        if (projI && !projI.value) projI.value = label;
+
+        // Update map badge
+        const badge = document.getElementById('map-proj');
+        if (badge) badge.textContent = item.display_name.split(',').slice(0, 2).join(', ');
+
+        searchInput.value = label;
+        hideSuggestions();
+      }
+
+      // Click on suggestion item
+      suggBox.addEventListener('click', e => {
+        const li = e.target.closest('li[data-idx]');
+        if (!li) return;
+        const idx = parseInt(li.dataset.idx);
+        if (currentSuggs[idx]) goToLocation(currentSuggs[idx]);
+      });
+
+      // Typing → debounced Nominatim fetch
+      searchInput.addEventListener('input', () => {
+        clearTimeout(debounceTimer);
+        const q = searchInput.value.trim();
+        if (q.length < 2) { hideSuggestions(); return; }
+        debounceTimer = setTimeout(async () => {
+          try {
+            const r = await fetch(
+              `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5`,
+              { headers: { 'Accept-Language': 'en', 'Accept': 'application/json' } }
+            );
+            const data = await r.json();
+            showSuggestions(data || []);
+          } catch { hideSuggestions(); }
+        }, 350);
+      });
+
+      // Enter → go to first suggestion
+      searchInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          if (currentSuggs.length) goToLocation(currentSuggs[0]);
+          else hideSuggestions();
+        }
+        if (e.key === 'Escape') hideSuggestions();
+      });
+
+      // Click outside → hide suggestions
+      document.addEventListener('click', e => {
+        if (!e.target.closest('.header-search')) hideSuggestions();
+      });
+    });
+  </script>
+
+</body>
+
+</html>

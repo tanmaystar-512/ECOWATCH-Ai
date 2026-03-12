@@ -1,0 +1,8 @@
+numpy
+scikit-image
+Pillow
+reportlab
+python-dotenv
+# Real-world remote sensing (optional but recommended):
+sentinelhub
+earthengine-api
